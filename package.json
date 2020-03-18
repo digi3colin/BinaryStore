@@ -1,6 +1,6 @@
 {
   "name": "@komino/binary-store",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Binary Store manage binary file format with custom header size in bytes, with configurable fixed data size in bits.",
   "main": "classes/BinaryStore.js",
   "scripts": {
