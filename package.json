@@ -1,0 +1,26 @@
+{
+  "name": "@komino/binary-store",
+  "version": "0.0.1",
+  "description": "Binary Store manage binary file format with custom header size in bytes, with configurable fixed data size in bits.",
+  "main": "classes/BinaryStore.js",
+  "scripts": {
+    "test": "jest --coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/digi3colin/BinaryStore.git"
+  },
+  "keywords": [
+    "ArrayBuffer",
+    "Binary"
+  ],
+  "author": "Colin Leung",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/digi3colin/BinaryStore/issues"
+  },
+  "homepage": "https://github.com/digi3colin/BinaryStore#readme",
+  "devDependencies": {
+    "jest": "^25.1.0"
+  }
+}
