@@ -1,5 +1,14 @@
-/* store the quantity of inventory */
 /**
+ * Copyright (c) 2020 Colin Leung (Komino)
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ */
+
+
+/**
+ * private method getByte;
  *
  * @param {DataView} data
  * @param {number} idx
@@ -31,7 +40,18 @@ const getByte = (data, idx, size) => {
   return {offsetByte : offsetByte, data: data, mask: max, frame: frame, frameSize : frameSize, valueOffset: valueOffset};
 };
 
+/**
+ * @param {Uint8Array} uint8Array
+ * @param {number} size
+ */
+const toBinaryString = (uint8Array, size = 8) => {
+  return uint8Array
+    .reduce((a , x) => "" + a + x.toString(2).padStart( 8 , "0" ), "")
+    .replace(new RegExp(`(.{${size}})`, "g"),"$1 ") ;
+};
+
 /*
+explain of the array buffer
 
 version 1, data size 16
 00 1       1 00 00
@@ -65,7 +85,7 @@ class BinaryStore{
     this.maxValue   = (2 ** dataBitSize) - 1;
 
     //data bytes + 1 byte header
-    const bufferSize = this.headerByteSize + Math.ceil((Math.max(2, values.length) * this.dataBitSize) / 8);
+    const bufferSize = this.headerByteSize + Math.ceil((Math.max(2, values.length) * this.dataBitSize) / 8 );
     this.setBuffer(new ArrayBuffer(bufferSize));
 
     values.forEach((x, i) => this.write(i, x));
@@ -73,7 +93,7 @@ class BinaryStore{
     this.makeHeader(this.header, this.headerByteSize, this.version, this.dataBitSize);
   }
 
-  /**
+  /*
    *
    * @param {ArrayBuffer} buffer
    */
@@ -153,20 +173,11 @@ class BinaryStore{
   }
 
   toString(){
-    const head = BinaryStore.toBinaryString(new Uint8Array(this.buffer.slice(0, this.headerByteSize)));
-    const tail = BinaryStore.toBinaryString(new Uint8Array(this.buffer, this.headerByteSize), this.dataBitSize);
+    const head = toBinaryString(new Uint8Array(this.buffer.slice(0, this.headerByteSize)));
+    const tail = toBinaryString(new Uint8Array(this.buffer, this.headerByteSize), this.dataBitSize);
     return head + ": " + tail;
   }
 
-  /**
-   * @param {Uint8Array} uint8Array
-   * @param {number} size
-   */
-  static toBinaryString(uint8Array, size = 8) {
-    return uint8Array
-      .reduce((a , x) => "" + a + x.toString(2).padStart( 8 , "0" ), "")
-      .replace(new RegExp(`(.{${size}})`, "g"),"$1 ") ;
-  }
 }
 
 Object.freeze(BinaryStore);
