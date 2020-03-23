@@ -21,7 +21,7 @@ describe('test binary store', () => {
     expect((255).toString(2)).toBe('11111111');
     expect((200).toString(2)).toBe('11001000');
 
-    expect(f.toString()).toBe('00011111 11101000 : 11111111 11001000 ');
+    expect(f.toString()).toBe('11111111 00001000 : 11111111 11001000 ');
   });
 
   test('3 byte header', () => {
@@ -43,7 +43,7 @@ describe('test binary store', () => {
     expect((255).toString(2)).toBe('11111111');
     expect((200).toString(2)).toBe('11001000');
 
-    expect(f.toString()).toBe('00000000 00000000 00011111 11101000 : 11111111 11001000 ');
+    expect(f.toString()).toBe('00000000 00000000 11111111 00001000 : 11111111 11001000 ');
   });
 
   test('init with values', () => {
@@ -53,8 +53,8 @@ describe('test binary store', () => {
 
     expect(f.toString()).toBe('01011101 00110011 10110010 01000100 00010000 : 0010111011100000 0000100101101101 ');
 
-    expect(f.read(0)).toBe(12000);
-    expect(f.read(1)).toBe(2413);
+    expect(f.read(0)).toBe(12000n);
+    expect(f.read(1)).toBe(2413n);
   });
 
   test('init with qty, 10 bit size', () => {
@@ -62,16 +62,16 @@ describe('test binary store', () => {
 
     expect(f.toString()).toBe('01011101 00110011 10110010 01000100 00001010 : 1000001000 1111111111 0000');
 
-    expect(f.read(0)).toBe(520);
-    expect(f.read(1)).toBe(1023);
+    expect(f.read(0)).toBe(520n);
+    expect(f.read(1)).toBe(1023n);
 
     f.write(3, 888);
-    expect(f.read(3)).toBe(888);
+    expect(f.read(3)).toBe(888n);
     expect(f.toString()).toBe('01011101 00110011 10110010 01000100 00001010 : 1000001000 1111111111 0000000000 1101111000 00000000');
 
     f.write(2, 56);
-    expect(f.read(3)).toBe(888);
-    expect(f.read(2)).toBe(56);
+    expect(f.read(3)).toBe(888n);
+    expect(f.read(2)).toBe(56n);
     expect(f.toString()).toBe('01011101 00110011 10110010 01000100 00001010 : 1000001000 1111111111 0000111000 1101111000 00000000');
 
     try{
@@ -102,7 +102,7 @@ describe('test binary store', () => {
   test('32bit integer', () => {
     const f = new BinaryStore(1563669060, 5, 32, [2147483642]);
     expect(f.toString()).toBe('01011101 00110011 10110010 01000100 00100000 : 01111111111111111111111111111010 00000000000000000000000000000000 ');
-    expect(f.read(0)).toBe(2147483642);
+    expect(f.read(0)).toBe(2147483642n);
 
   });
 
@@ -120,4 +120,11 @@ describe('test binary store', () => {
     const f = new BinaryStore();
     expect(f.toString()).toBe('00101000 : 00000000 00000000 ');
   })
+
+  test('big integer', () =>{
+    const ver = BigInt('0b101011111111000000001111111100000000');//47227928320n;//BigInt(0b1010_1111_1111_0000_0000_1111_1111_0000_0000);
+    const f = new BinaryStore(ver, 6, 8, [255, 200]);
+    expect(f.toString()).toBe( '00001010 11111111 00000000 11111111 00000000 00001000 : 11111111 11001000 ');
+  })
+
 });

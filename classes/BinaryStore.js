@@ -6,38 +6,36 @@
  *
  */
 
-
+const ceilDivide = (x, y) => (x + y - 1n) / y;
 /**
  * private method getByte;
  *
  * @param {DataView} data
- * @param {number} idx
- * @param {number} size
+ * @param {BigInt} idx
+ * @param {BigInt} size
  * @return *
+ *
  */
-const getByte = (data, idx, size) => {
-  const offsetBit = idx * size;
-  const offsetByte = Math.floor(offsetBit / 8);
-  const shiftBit   = offsetBit % 8;
+const getFrame = (data, idx, size) => {
+  const startBit = idx * size;
+  const endBit   = startBit + size;
 
-  const max = (2 ** size) - 1;
+  const startByte =  startBit / 8n; //Math.floor(startBit);
+  const endByte   = ceilDivide( endBit, 8n);
 
-  const frameSize   = (size <= 8) ? 8 : ((size <= 16) ? 16 : 32);
-  let frame;
-  switch (frameSize) {
-    case (8):
-      frame = data.getUint8(offsetByte);
-      break;
-    case (16):
-      frame = data.getUint16(offsetByte);
-      break;
-    default :
-      frame = data.getUint32(offsetByte);
+  let result = BigInt(0);
+  for(let i = startByte; i < endByte; i++ ){
+    const segment = BigInt(data.getUint8(parseInt(i)));
+    result = result << 8n | segment;
   }
 
-  const valueOffset = (frameSize - size - shiftBit);
-
-  return {offsetByte : offsetByte, data: data, mask: max, frame: frame, frameSize : frameSize, valueOffset: valueOffset};
+  return {
+    frame : result,
+    startBit: startBit,
+    endBit: endBit,
+    startByte: startByte,
+    endByte: endByte
+  };
 };
 
 /**
@@ -71,7 +69,7 @@ version 1, data size 10
 class BinaryStore{
   /**
    *
-   * @param {number} version
+   * @param {number | BigInt} version
    * @param {number} headerByteSize
    * @param {number} dataBitSize
    * @param {number[]}values
@@ -79,18 +77,18 @@ class BinaryStore{
   constructor(version= 1, headerByteSize= 1, dataBitSize= 8, values = []) {
     if(version < 0 || headerByteSize < 0 || dataBitSize < 0 )throw new Error('BinaryStore: arguments cannot be negative');
 
-    this.version    = version;
+    this.version = version;
     this.headerByteSize = headerByteSize;
-    this.dataBitSize   = dataBitSize;
-    this.maxValue   = (2 ** dataBitSize) - 1;
+    this.dataBitSize = dataBitSize;
+    this.maxValue = (2 ** dataBitSize) - 1;
 
     //data bytes + 1 byte header
     const bufferSize = this.headerByteSize + Math.ceil((Math.max(2, values.length) * this.dataBitSize) / 8 );
     this.setBuffer(new ArrayBuffer(bufferSize));
 
-    values.forEach((x, i) => this.write(i, x));
-
     this.makeHeader(this.header, this.headerByteSize, this.version, this.dataBitSize);
+
+    values.forEach((x, i) => this.write(i, x));
   }
 
   /*
@@ -113,31 +111,46 @@ class BinaryStore{
     //create default header;
     switch (headerByteSize) {
       case (1):
+        //8bit
+        //poor man, max dataBitSize = 5
         header.setUint8(0, version << 5 | dataBitSize);
         break;
       case (2):
-        header.setUint16(0, version << 5 | dataBitSize);
+        //16bit
+        //max version = (2 ** 8 - 1) 255
+        //max dataBitSize = 255
+        header.setUint8(0, version);
+        header.setUint8(1, dataBitSize);
         break;
       case (3):
+        //24bit
+        //max version = (2 ** 16 - 1) 65535
+        //max dataBitSize = 255
         header.setUint16(0, version);
         header.setUint8(2, dataBitSize);
         break;
       case (4):
-        header.setUint32(0, version << 5 | dataBitSize);
+        //32bit
+        //max version = (2 ** 24 - 1 ) 16777215
+        //max dataBitSize = 255
+        header.setUint32(0, version << 8 | dataBitSize);
         break;
-      default :
+      case (5):
+        //40bit
+        //max version = 2 ** 32 - 1
+        //max dataBitSize = 255
         header.setUint32(0, version);
         header.setUint8(4, dataBitSize);
-    }
-  }
+        break;
+      default :
+        let bits = BigInt(version);
+        for(let offset = (headerByteSize - 2); offset >= 0 ; offset--){
+          header.setUint8(offset, parseInt(bits & 255n));
+          bits = bits >> 8n;
+        }
 
-  /**
-   * @param {number} idx
-   * @return number
-   */
-  read(idx){
-    const {mask, frame, valueOffset} = getByte(this.data, idx, this.dataBitSize);
-    return (frame >> valueOffset) & mask;
+        header.setUint8((headerByteSize - 1), dataBitSize);
+    }
   }
 
   expandBuffer(){
@@ -147,28 +160,43 @@ class BinaryStore{
   }
 
   /**
-   * @param {number} idx
-   * @param {number} value
+   * @param {number} index
+   * @return BigInt
    */
-  write(idx, value){
-    if(value > this.maxValue)throw new Error('value is bigger than ' + this.maxValue);
-    if(idx >= (this.buffer.byteLength - this.headerByteSize)){
+  read(index){
+    const idx = BigInt(index);
+    const size = BigInt(this.dataBitSize);
+    const {frame, endByte} = getFrame(this.data, idx , size);
+
+    const shift = (endByte * 8n) - ((idx + 1n) * size);
+    const mask = (2n ** size - 1n);
+
+    return (frame >> shift) & mask;
+  }
+
+  /**
+   * @param {number} index
+   * @param {number | BigInt} newValue
+   */
+  write(index, newValue){
+    if(newValue > this.maxValue)throw new Error('value is bigger than ' + this.maxValue);
+    if(index >= (this.buffer.byteLength - this.headerByteSize)){
       this.expandBuffer();
     }
 
-    const {data, offsetByte, mask, frameSize, frame, valueOffset} = getByte(this.data, idx, this.dataBitSize);
+    const value = BigInt(newValue);
+    const idx = BigInt(index);
+    const size = BigInt(this.dataBitSize);
+    const {frame, startByte, endByte} = getFrame(this.data, idx , size);
 
-    const newFrame = frame & ~(mask << valueOffset) | (value << valueOffset);
+    const maskShift = (endByte * 8n) - ((idx + 1n) * size);
+    const resultBitSize = (endByte - startByte) * 8n;
+    const mask = (2n ** resultBitSize - 1n) ^ (((2n ** size - 1n)) << maskShift);
 
-    switch (frameSize) {
-      case (8):
-        data.setUint8(offsetByte, newFrame);
-        break;
-      case (16):
-        data.setUint16(offsetByte, newFrame);
-        break;
-      default :
-        data.setUint32(offsetByte, newFrame);
+    let bits = (frame & mask) | (value << maskShift);
+    for(let i = endByte - 1n ; i >= startByte; i-- ){
+      this.data.setUint8(parseInt(i), parseInt(bits & 255n));
+      bits = bits >> 8n;
     }
   }
 
